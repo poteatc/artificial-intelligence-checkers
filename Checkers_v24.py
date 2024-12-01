@@ -74,19 +74,57 @@ class Checkers:
         if s.state == 'CustomSetup':
             s.SetupBoard()
 
+    def EvaluateBoard(s):
+        """
+        Heuristic to evaluate the board state relative to the current player.
+        Positive scores favor the current player (s.pTurn), and negative scores favor the opponent.
+        """
+        current_player = s.pTurn  # Player whose turn it is
+        opponent = s.opposite(s.pTurn)  # Opponent of the current player
+        score = 0
+        for i in range(s.BoardDimension):
+            for j in range(s.BoardDimension):
+                tile = s.tiles[i][j]
+                if tile.isPiece:
+                    piece_value = 10  # Base value for pawns
+                    king_value = 15  # Additional value for kings
+                    positional_bonus = (s.BoardDimension - 1 - j) if tile.isWhite else j  # Encourage advancement
+
+                    # Assign values based on the piece's owner
+                    if tile.pieceColour == current_player:
+                        score += piece_value
+                        if tile.isKing:
+                            score += king_value
+                        score += positional_bonus  # Reward for advancing
+                    elif tile.pieceColour == opponent:
+                        score -= piece_value
+                        if tile.isKing:
+                            score -= king_value
+                        score -= positional_bonus  # Penalty for opponent advancing
+
+                    # Positional safety: Discourage edge or corner placement
+                    if i in [0, s.BoardDimension - 1] or j in [0, s.BoardDimension - 1]:
+                        safety_penalty = 5  # Safety penalty for edges or corners
+                        if tile.pieceColour == current_player:
+                            score -= safety_penalty
+                        elif tile.pieceColour == opponent:
+                            score += safety_penalty
+        return score
+
     ####
     # +-added to be able to control the computer's turn
     ####
     def CompTurn(s):
         s.moves = s.movesAvailable()
         s.badMoves = []
+
         #######consider making s.goodMoves which replaces s.badMoves for many uses (changes conditions a bit as well)
 
         # To prevent leaving the back row (currently top priority)
-        for move in s.moves:
-            if s.movesFromBack(move):
-                s.badMoves.append(move)
-        s.removeBadMoves()
+        # for move in s.moves:
+        #     if s.movesFromBack(move):
+        #         s.badMoves.append(move)
+        # s.removeBadMoves()
 
         # This may not always work, it is not expected/designed to (hopefully it usually works)
         # It is meant to promote the use of moves that allow capture of another piece afterwards
@@ -136,7 +174,24 @@ class Checkers:
         # Promotes moves which does not endanger itself needlessly
         for move in s.moves:
             if not s.isMoveSafe(move):
-                s.badMoves.append(move)
+                # can sacrifice a piece and makes sure it won't be double jumped (only works if comp is white)
+                if (move[0] - 1 >= 0 and move[0] - 2 >= 0 and move[0] + 1 <= 7 and move[0] + 2 <= 7 and move[
+                    1] - 1 >= 0 and move[1] - 2 >= 0 and move[1] + 1 <= 7 and move[1] + 2 <= 7):
+                    if not (((s.tiles[move[0] - 1][move[1] - 1].isPiece and s.compIsColour == s.tiles[move[0] - 1][
+                        move[1] - 1].pieceColour) and \
+                             (s.tiles[move[0] - 2][move[1] - 2].isPiece and s.compIsColour == s.tiles[move[0] - 2][
+                                 move[1] - 2].pieceColour)) or \
+                            ((s.tiles[move[0] + 1][move[1] - 1].isPiece and s.compIsColour == s.tiles[move[0] + 1][
+                                move[1] - 1].pieceColour) and \
+                             (s.tiles[move[0] + 2][move[1] - 2].isPiece and s.compIsColour == s.tiles[move[0] + 2][
+                                 move[1] - 2].pieceColour)) or \
+                            ((s.tiles[move[2]][move[3]].x < s.tiles[move[0]][move[1]].x) and \
+                             (s.tiles[move[0] - 2][move[1]].isPiece and s.compIsColour == s.tiles[move[0] - 2][
+                                 move[1]].pieceColour)) or \
+                            ((s.tiles[move[2]][move[3]].x > s.tiles[move[0]][move[1]].x) and \
+                             (s.tiles[move[0] + 2][move[1]].isPiece and s.compIsColour == s.tiles[move[0] - 2][
+                                 move[1]].pieceColour))):
+                        s.badMoves.append(move)
         s.removeBadMoves()
 
         # should implement the next part to pick at random from the remaining moves (does not do this)
@@ -173,7 +228,8 @@ class Checkers:
         X1, X2, Y1, Y2 = [x - 1, x + 1], [x - 2, x + 2], [y - 1, y + 1], [y - 2, y + 2]
         if ((0 <= X < 8) and (0 <= Y < 8)) and ((0 <= x < 8) and (0 <= y < 8)):
             if (piece2Colour == s.opposite(s.tiles[x][y].pieceColour)):
-                if s.CanDoWalk(x, y, X, Y, exception=False):
+                if s.CanDoWalk(x, y, X, Y,
+                               exception=False):  # if other player has a piece that can capture where comp piece moves to
                     for i in range(2):
                         for j in range(2):
                             if X1[i] == X and Y1[j] == Y:
@@ -471,7 +527,8 @@ class Checkers:
                                      s.placeRank)  # updates that square in array
                 s.SetButtons()
 
-    # Handles mouse clicks
+        # Handles mouse clicks
+
     def clickInPlay(s, X, Y):
         # +-added X and Save clicked if statements
         if (10 <= X < 11 and -3 <= Y < -2):  # X clicked
@@ -534,7 +591,8 @@ class Checkers:
                     s.tiles[X][Y] = Tile(s.win, X, Y, s.tiles[X][Y].isPiece, s.tiles[X][Y].pieceColour,
                                          s.tiles[X][Y].pieceRank, isSelected=True)
 
-    # +-added to determine whether the tile attempting to be selected is valid
+        # +-added to determine whether the tile attempting to be selected is valid
+
     def validTileSelect(s, X, Y):
         if (0 <= X < 8 and 0 <= Y < 8):  # Tile Clicked in Play
             if s.selectedTileAt != []:  # move if able
@@ -558,7 +616,8 @@ class Checkers:
         else:
             return False
 
-    # +-added to determine whether the tile attempting to be moved to is valid
+        # +-added to determine whether the tile attempting to be moved to is valid
+
     def validTileMove(s, X, Y):
         if (0 <= X < 8 and 0 <= Y < 8):  # Tile Clicked in Play
             if s.selectedTileAt != []:  # move if able
@@ -590,9 +649,10 @@ class Checkers:
             else:
                 return False
 
-    ########
-    # This Function Enables a Piece to move. Trace Back --> Requirement 1.3
-    ########
+        ########
+        # This Function Enables a Piece to move. Trace Back --> Requirement 1.3
+        ########
+
     def move(s, x, y, X,
              Y):  # parameters -> self,starting x,starting y,final X,final Y      assumes valid move as input
         s.tiles[X][Y] = Tile(s.win, X, Y, True, s.tiles[x][y].pieceColour, s.tiles[x][y].pieceRank)
@@ -604,12 +664,13 @@ class Checkers:
         s.tiles[X][Y] = Tile(s.win, X, Y, True, s.tiles[X][Y].pieceColour, s.tiles[X][Y].pieceRank)
         s.tiles[x][y] = Tile(s.win, x, y, isPiece=False)
         if X - x == 2 or X - x == -2:
-            if s.numColour(s.tiles[x + (X - x) / 2][y + (Y - y) / 2].pieceColour) == 1:
+            if s.numColour(s.tiles[int(x + (X - x) / 2)][int(y + (Y - y) / 2)].pieceColour) == 1:
                 tkMessageBox.showinfo("Winner", str(s.tiles[X][Y].pieceColour) + ' Wins!')
                 # +-updated to allow another game to be played after a winner is declared
                 s.state = 'CustomSetup'
                 s.SetButtons()
-            s.tiles[x + (X - x) / 2][y + (Y - y) / 2] = Tile(s.win, x + (X - x) / 2, y + (Y - y) / 2, isPiece=False)
+            s.tiles[int(x + (X - x) / 2)][int(y + (Y - y) / 2)] = Tile(s.win, x + (X - x) / 2, y + (Y - y) / 2,
+                                                                       isPiece=False)
 
             s.tiles[X][Y] = Tile(s.win, X, Y, True, s.tiles[X][Y].pieceColour, s.tiles[X][Y].pieceRank)
             if s.PieceCanCapture(X, Y):
@@ -624,7 +685,8 @@ class Checkers:
             s.tiles[X][Y] = Tile(s.win, X, Y, True, s.tiles[X][Y].pieceColour, s.tiles[X][Y].pieceRank)
             s.pieceCaptured = False
 
-    # the below few functions need conditions added to handle out of bounds errors (for being off grid, i.e. 0<=X<8 or 0<=Y<8 doesn't hold)      <--- I think this is handled in PieceCanCapturePiece
+        # the below few functions need conditions added to handle out of bounds errors (for being off grid, i.e. 0<=X<8 or 0<=Y<8 doesn't hold)      <--- I think this is handled in PieceCanCapturePiece
+
     def PlayerCanCapture(s):
         for i in range(s.BoardDimension):
             for j in range(s.BoardDimension):
@@ -642,9 +704,10 @@ class Checkers:
                     return True
         return False
 
-    #########
-    # This Function enables a tile to capture and remove an opponent piece. Trace Back --> Requirement 1.5
-    #########
+        #########
+        # This Function enables a tile to capture and remove an opponent piece. Trace Back --> Requirement 1.5
+        #########
+
     def PieceCanCapturePiece(s, x, y, X, Y):
         X1, X2, Y1, Y2 = [x - 1, x + 1], [x - 2, x + 2], [y - 1, y + 1], [y - 2, y + 2]
         # +-added first two if conditions
@@ -659,9 +722,10 @@ class Checkers:
                                         return True
         return False
 
-    ############
-    # This Function enables a tile to jump over opponent piece. Trace Back --> Requirement 1.5
-    ############
+        ############
+        # This Function enables a tile to jump over opponent piece. Trace Back --> Requirement 1.5
+        ############
+
     def PieceCanJumpTo(s, x, y, X, Y):
         X1, X2, Y1, Y2 = [x - 1, x + 1], [x - 2, x + 2], [y - 1, y + 1], [y - 2, y + 2]
         for i in range(2):
@@ -671,9 +735,10 @@ class Checkers:
                         return True
         return False
 
-    ########
-    # This Function enables a king to move front and back. Trace Back --> Requirement 1.5
-    ########
+        ########
+        # This Function enables a king to move front and back. Trace Back --> Requirement 1.5
+        ########
+
     def CanDoWalk(s, x, y, X, Y,
                   exception=False):  # The final parameter is to add a special case such that PieceCanCapturePiece may use this method
         X1, Y1 = [x - 1, x + 1], [y - 1, y + 1]
