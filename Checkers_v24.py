@@ -1,3 +1,5 @@
+import random
+
 from graphics import *
 import sys
 import tkinter.messagebox as tkMessageBox
@@ -66,140 +68,490 @@ class Checkers:
     ####
     def Play(s):
         while s.state == 'Play':
-            # +-added if statement
+            # Handle the computer's turn (when it's the computer's turn in 1P mode)
             if s.is1P and s.compIsColour == s.pTurn:
-                s.CompTurn()
+                s.CompTurn()  # Computer makes its move using Minimax
+
+            # Handle the human player's turn (player clicks to make a move)
             else:
-                s.Click()
+                s.Click()  # Wait for the human player to make a move
+
+            # Switch turns manually by toggling pTurn
+            #s.pTurn = s.opposite(s.pTurn)  # Assuming opposite() method works to swap turns
+
+        # If in custom setup state, setup the board
         if s.state == 'CustomSetup':
             s.SetupBoard()
 
-    def EvaluateBoard(s):
-        """
-        Heuristic to evaluate the board state relative to the current player.
-        Positive scores favor the current player (s.pTurn), and negative scores favor the opponent.
-        """
-        current_player = s.pTurn  # Player whose turn it is
-        opponent = s.opposite(s.pTurn)  # Opponent of the current player
-        score = 0
-        for i in range(s.BoardDimension):
-            for j in range(s.BoardDimension):
-                tile = s.tiles[i][j]
-                if tile.isPiece:
-                    piece_value = 10  # Base value for pawns
-                    king_value = 15  # Additional value for kings
-                    positional_bonus = (s.BoardDimension - 1 - j) if tile.isWhite else j  # Encourage advancement
+    # def GenerateMoves(s, player):
+    #     """
+    #     Generate all possible moves for the given player.
+    #     If a capture move is available, return only capture moves.
+    #     """
+    #     moves = []
+    #     capture_moves = []
+    #
+    #     # Loop through the board and generate valid moves for the player
+    #     for x in range(8):
+    #         for y in range(8):
+    #             if s.tiles[x][y].pieceColour == player:  # If the piece belongs to the current player
+    #                 # Generate normal (non-capturing) moves
+    #                 normal_moves = s.GetNormalMoves(x, y)
+    #                 for move in normal_moves:
+    #                     if s.moveIsValid(x, y, move[0], move[1]):  # Validate the move
+    #                         moves.append([x, y, move[0], move[1]])
+    #
+    #                 # Generate capturing moves
+    #                 capture_moves = s.GetCaptureMoves(x, y)
+    #                 for capture in capture_moves:
+    #                     if s.moveIsValid(x, y, capture[0], capture[1]):  # Validate the capture
+    #                         capture_moves.append([x, y, capture[0], capture[1]])
+    #
+    #     # If there are capture moves, return only those
+    #     if capture_moves:
+    #         return capture_moves
+    #
+    #     # Otherwise, return normal moves
+    #     return moves
 
-                    # Assign values based on the piece's owner
-                    if tile.pieceColour == current_player:
-                        score += piece_value
-                        if tile.isKing:
-                            score += king_value
-                        score += positional_bonus  # Reward for advancing
-                    elif tile.pieceColour == opponent:
-                        score -= piece_value
-                        if tile.isKing:
-                            score -= king_value
-                        score -= positional_bonus  # Penalty for opponent advancing
+    # def CanCapture(s, x, y, X, Y):
+    #     """
+    #     Check if a capture is possible from (x, y) to (X, Y).
+    #     A capture move requires jumping over an opponent's piece to an empty square.
+    #     """
+    #     dx = X - x
+    #     dy = Y - y
+    #
+    #     # The capture must be a valid diagonal move (i.e., dx, dy should be 2 or -2)
+    #     if abs(dx) == 2 and abs(dy) == 2:
+    #         # Get the middle square between (x, y) and (X, Y)
+    #         mid_x = (x + X) // 2
+    #         mid_y = (y + Y) // 2
+    #
+    #         # Ensure mid_x and mid_y are within the bounds of the board
+    #         if not (0 <= mid_x < 8 and 0 <= mid_y < 8):
+    #             return False  # Middle tile is out of bounds, so capture is not possible
+    #
+    #         # Ensure there is an opponent's piece in the middle square
+    #         mid_tile = s.tiles[mid_x][mid_y]
+    #         if mid_tile.isPiece and mid_tile.pieceColour != s.pTurn:
+    #             # The middle square contains an opponent's piece, so capture is possible
+    #             return True
+    #
+    #     # If the move is not a valid capture move
+    #     return False
 
-                    # Positional safety: Discourage edge or corner placement
-                    if i in [0, s.BoardDimension - 1] or j in [0, s.BoardDimension - 1]:
-                        safety_penalty = 5  # Safety penalty for edges or corners
-                        if tile.pieceColour == current_player:
-                            score -= safety_penalty
-                        elif tile.pieceColour == opponent:
-                            score += safety_penalty
-        return score
+    # def ApplyMove(s, move):
+    #     """
+    #     Apply the specified move to the board.
+    #     """
+    #
+    #     # (x, y), (X, Y) = move
+    #     x, y, X, Y = move  # Unpack directly from a 4-tuple
+    #     print(f"Applying move from ({x}, {y}) to ({X}, {Y})")
+    #     s.tiles[X][Y] = Tile(s.win, X, Y, s.tiles[x][y].isPiece,
+    #                          s.tiles[x][y].pieceColour, s.tiles[x][y].pieceRank)
+    #     s.tiles[x][y] = Tile(s.win, x, y, False)  # Clear the original tile
+    #     if s.tiles[X][Y].isPawn and ((s.tiles[X][Y].isWhite and Y == s.BoardDimension - 1) or
+    #                                  (s.tiles[X][Y].isBlack and Y == 0)):
+    #         s.tiles[X][Y].isKing = True  # Promote to king if it reaches the last row
+
+    # def UndoMove(s, move, original_tiles):
+    #     """
+    #     Undo the specified move and restore the original tiles.
+    #     """
+    #     print(f"UndoMove received original_tiles: {type(original_tiles)}")
+    #
+    #     # Ensure original_tiles is a tuple before unpacking
+    #     if isinstance(original_tiles, tuple) and len(original_tiles) == 2:
+    #         original_source, original_dest = original_tiles  # Unpack the tuple
+    #
+    #         # Perform the undo logic here
+    #         x, y, X, Y = move  # Unpack the 4-tuple of move
+    #
+    #         # Revert the source tile and destination tile to their original states
+    #         s.tiles[x][y] = Tile(s.win, x, y, original_source.isPiece,
+    #                              original_source.pieceColour, original_source.pieceRank)
+    #         s.tiles[X][Y] = Tile(s.win, X, Y, original_dest.isPiece,
+    #                              original_dest.pieceColour, original_dest.pieceRank)
+    #
+    #         print(f"UndoMove completed for move: {move}")
+    #     else:
+    #         print("ERROR: original_tiles is not a tuple or has unexpected length")
+    #         print(f"Received original_tiles: {original_tiles}")
+
+    # def EvaluateBoard(s):
+    #     """
+    #     Heuristic to evaluate the board state relative to the current player.
+    #     Positive scores favor the current player (s.pTurn), and negative scores favor the opponent.
+    #     """
+    #     current_player = s.pTurn  # Player whose turn it is
+    #     opponent = s.opposite(s.pTurn)  # Opponent of the current player
+    #     score = 0
+    #     for i in range(s.BoardDimension):
+    #         for j in range(s.BoardDimension):
+    #             tile = s.tiles[i][j]
+    #             if tile.isPiece:
+    #                 piece_value = 10  # Base value for pawns
+    #                 king_value = 15  # Additional value for kings
+    #                 positional_bonus = (s.BoardDimension - 1 - j) if tile.isWhite else j  # Encourage advancement
+    #
+    #                 # Assign values based on the piece's owner
+    #                 if tile.pieceColour == current_player:
+    #                     score += piece_value
+    #                     if tile.isKing:
+    #                         score += king_value
+    #                     score += positional_bonus  # Reward for advancing
+    #                 elif tile.pieceColour == opponent:
+    #                     score -= piece_value
+    #                     if tile.isKing:
+    #                         score -= king_value
+    #                     score -= positional_bonus  # Penalty for opponent advancing
+    #
+    #                 # Positional safety: Discourage edge or corner placement
+    #                 if i in [0, s.BoardDimension - 1] or j in [0, s.BoardDimension - 1]:
+    #                     safety_penalty = 5  # Safety penalty for edges or corners
+    #                     if tile.pieceColour == current_player:
+    #                         score -= safety_penalty
+    #                     elif tile.pieceColour == opponent:
+    #                         score += safety_penalty
+    #     return score
+
+    # def GameOver(self):
+    #     # Count remaining pieces for each player
+    #     white_pieces = self.numColour('White')
+    #     black_pieces = self.numColour('Black')
+    #
+    #     # Check if either player has no pieces left
+    #     if white_pieces == 0 or black_pieces == 0:
+    #         return True
+    #
+    #     # Generate moves for both players
+    #     white_moves = self.movesAvailableForPlayer('White')
+    #     black_moves = self.movesAvailableForPlayer('Black')
+    #
+    #     # Check if either player has no legal moves left
+    #     if not white_moves or not black_moves:
+    #         return True
+    #
+    #     return False
+
+    # def movesAvailableForPlayer(self, player):
+    #     original_turn = self.pTurn
+    #     self.pTurn = player  # Temporarily set the player's turn
+    #     moves = self.movesAvailable()
+    #     self.pTurn = original_turn  # Restore the original turn
+    #     return moves
+
+    # def Minimax(s, depth, isMaximizing, alpha=float('-inf'), beta=float('inf')):
+    #     """
+    #     Minimax algorithm with depth control, using attributes and methods from the Checkers class.
+    #     """
+    #     # If depth is 0 or the game is over, evaluate the board
+    #     if depth == 0 or s.GameOver():
+    #         return s.EvaluateBoard()
+    #
+    #     player = s.pTurn
+    #     opponent = s.opposite(player)
+    #     best_score = float('-inf') if isMaximizing else float('inf')
+    #
+    #     # Generate possible moves for the current player
+    #     moves = s.GenerateMoves(player if isMaximizing else opponent)
+    #
+    #     best_move = None  # Track the best move
+    #
+    #     # Store the history of moves for undoing purposes
+    #     move_history = []
+    #
+    #     for move in moves:
+    #         x, y, X, Y = move  # Unpack move
+    #
+    #         # Validate the move before applying it
+    #         if not s.moveIsValid(x, y, X, Y):
+    #             continue  # Skip invalid moves
+    #
+    #         # Save the original state of the tiles for undoing the move
+    #         original_source = s.tiles[x][y]
+    #         original_dest = s.tiles[X][Y]
+    #
+    #         # Apply the move to the board
+    #         s.ApplyMove(move)
+    #         move_history.append((move, (original_source, original_dest)))  # Track the move and original tiles
+    #
+    #         # Update the player's turn for the recursive call
+    #         s.pTurn = opponent  # Switch to the opponent for the next level
+    #
+    #         # Recursively call Minimax for the next depth and the opponent's turn
+    #         score = s.Minimax(depth - 1, not isMaximizing, alpha, beta)
+    #
+    #         # Undo the move to restore the board to its original state
+    #         s.UndoMove(move, (original_source, original_dest))  # Pass both tiles as a tuple to undo the move
+    #
+    #         # Update best score depending on the maximizing or minimizing player
+    #         if isMaximizing:
+    #             if score > best_score:
+    #                 best_score = score
+    #                 best_move = move
+    #             alpha = max(alpha, score)
+    #         else:
+    #             if score < best_score:
+    #                 best_score = score
+    #                 best_move = move
+    #             beta = min(beta, score)
+    #
+    #         # Alpha-beta pruning
+    #         if beta <= alpha:
+    #             break
+    #
+    #     # After evaluating all moves, apply the best move found
+    #     if best_move:
+    #         # Unpack the best move
+    #         x, y, X, Y = best_move
+    #
+    #         # Save the original state of the tiles before applying the best move
+    #         original_source = s.tiles[x][y]
+    #         original_dest = s.tiles[X][Y]
+    #
+    #         # Apply the best move for the computer
+    #         s.ApplyMove(best_move)
+    #
+    #         # Return the score and the move chosen
+    #         return best_score
+    #
+    #     # If no valid moves were found, return a score of 0 (no good move found)
+    #     return 0
+
+    # def GetCaptureMoves(s, x, y):
+    #     capture_moves = []
+    #     # Check if there are any valid capture moves from position (x, y)
+    #     # This will involve checking the opponent's pieces and ensuring that a capture can happen
+    #     # Example: Checking diagonal moves for captures (needs actual logic)
+    #     directions = [(-2, -2), (-2, 2), (2, -2), (2, 2)]  # Directions to check for captures
+    #     for dx, dy in directions:
+    #         if s.CanCapture(x, y, x + dx, y + dy):
+    #             capture_moves.append((x, y, x + dx, y + dy))  # Capture move from (x, y) to (x+dx, y+dy)
+    #     return capture_moves
+    #
+
+
+    # def GetNormalMoves(s, x, y):
+    #     normal_moves = []
+    #
+    #     # Example: Check if the piece can move one step diagonally forward
+    #     # Note: The piece must move to an empty tile and not off the board.
+    #     directions = [(-1, -1), (-1, 1)]  # Diagonal directions (top-left, top-right) for white pieces
+    #     if s.tiles[x][y].isBlack:  # If the piece is black, the directions are reversed
+    #         directions = [(1, -1), (1, 1)]  # Diagonal directions (bottom-left, bottom-right) for black pieces
+    #
+    #     for dx, dy in directions:
+    #         new_x, new_y = x + dx, y + dy
+    #         if 0 <= new_x < 8 and 0 <= new_y < 8:  # Ensure the move is within bounds
+    #             if not s.tiles[new_x][new_y].isPiece:  # Check if the destination is empty
+    #                 normal_moves.append((x, y, new_x, new_y))  # Add valid move
+    #
+    #     return normal_moves
+
+    # def CompTurn(s):
+    #     """
+    #     Computer turn logic using the Minimax algorithm for decision-making.
+    #     """
+    #     s.moves = s.movesAvailable()  # Generate available moves
+    #     if not s.moves:
+    #         return  # No moves available, skip turn
+    #
+    #     best_score = float('-inf')  # For maximizing player (computer)
+    #     best_move = None
+    #     depth = 2  # Set Minimax search depth (adjust for performance)
+    #
+    #     # Evaluate each move using Minimax
+    #     for move in s.moves:
+    #         # Simulate the move
+    #         original_tile = s.tiles[move[2]][move[3]]  # Save the destination tile's state
+    #         s.ApplyMove(move)  # Apply the move
+    #
+    #         # Use Minimax to evaluate the resulting board
+    #         score = s.Minimax(depth, False)  # False because next player is minimizing
+    #
+    #         # Undo the move to restore the original game state
+    #         s.UndoMove(move, original_tile)
+    #
+    #         # Check if this move is better than the current best
+    #         if score > best_score:
+    #             best_score = score
+    #             best_move = move
+    #
+    #     # Perform the best move
+    #     if best_move:
+    #         if s.selectedTileAt == []:
+    #             s.Action(best_move[0], best_move[1])
+    #         s.Action(best_move[2], best_move[3])
+
+    def CompTurn(s):
+        """
+        Enhanced AI turn logic with scoring and better prioritization of moves.
+        """
+        s.moves = s.movesAvailable()  # Generate available moves
+        if not s.moves:
+            return  # No moves available, skip turn
+
+        move_scores = []
+
+        for move in s.moves:
+            score = 0
+
+            # Discourage leaving the back row
+            if s.movesFromBack(move):
+                score -= 50
+
+            # Encourage moves that allow capture of another piece afterward
+            if s.PieceCanCapture(*s.moveEndsAt(move)):
+                score += 30
+
+            # Promote moves that create kings
+            if (
+                    (s.moveEndsAt(move)[1] == 7 and s.tiles[move[0]][move[1]].isWhite)
+                    or (s.moveEndsAt(move)[1] == 0 and s.tiles[move[0]][move[1]].isBlack)
+            ) and s.tiles[move[0]][move[1]].isPawn:
+                score += 100
+
+            # Promote moves that take kings for free
+            if s.tiles[move[2]][move[3]].isKing and s.isMoveSafe(move):
+                score += 80
+
+            # Encourage trading pawns for opponent kings
+            if (
+                    s.tiles[move[0]][move[1]].isPawn
+                    and s.tiles[move[2]][move[3]].isKing
+                    and not s.isMoveSafe(move)
+            ):
+                score += 40
+
+            # Encourage trading kings when ahead
+            if (
+                    s.tiles[move[0]][move[1]].isKing
+                    and s.tiles[move[2]][move[3]].isKing
+                    and not s.isMoveSafe(move)
+                    and s.hasMorePieces()
+            ):
+                score += 60
+
+            # Encourage trading pawns when ahead
+            if (
+                    s.tiles[move[0]][move[1]].isPawn
+                    and s.tiles[move[2]][move[3]].isPawn
+                    and not s.isMoveSafe(move)
+                    and s.hasMorePieces()
+            ):
+                score += 20
+
+            # Penalize moves that are unsafe
+            if not s.isMoveSafe(move):
+                score -= 100
+
+            # Store move with its score
+            move_scores.append((move, score))
+
+        # Choose the best move(s)
+        max_score = max(score for _, score in move_scores)
+        best_moves = [move for move, score in move_scores if score == max_score]
+
+        # Randomly pick one if multiple moves have the same score
+        selected_move = random.choice(best_moves)
+
+        # Execute the move
+        if s.selectedTileAt == []:
+            s.Action(selected_move[0], selected_move[1])
+        s.Action(selected_move[2], selected_move[3])
 
     ####
     # +-added to be able to control the computer's turn
     ####
-    def CompTurn(s):
-        s.moves = s.movesAvailable()
-        s.badMoves = []
-
-        #######consider making s.goodMoves which replaces s.badMoves for many uses (changes conditions a bit as well)
-
-        # To prevent leaving the back row (currently top priority)
-        # for move in s.moves:
-        #     if s.movesFromBack(move):
-        #         s.badMoves.append(move)
-        # s.removeBadMoves()
-
-        # This may not always work, it is not expected/designed to (hopefully it usually works)
-        # It is meant to promote the use of moves that allow capture of another piece afterwards
-        for move in s.moves:
-            if not s.PieceCanCapture(s.moveEndsAt(move)[0], s.moveEndsAt(move)[1]):
-                s.badMoves.append(move)
-        s.removeBadMoves()
-
-        # Promotes move which make kings
-        for move in s.moves:
-            if not (((s.moveEndsAt(move)[1] == 7 and s.tiles[move[0]][move[1]].isWhite) or \
-                     (s.moveEndsAt(move)[1] == 0 and s.tiles[move[0]][move[1]].isBlack)) and \
-                    s.tiles[move[0]][move[1]].isPawn):
-                s.badMoves.append(move)
-        s.removeBadMoves()
-
-        # Promotes moves which take kings for free
-        for move in s.moves:
-            if not ((s.tiles[move[2]][move[3]].isKing) and s.isMoveSafe(move)):
-                s.badMoves.append(move)
-        s.removeBadMoves()
-
-        # This may not always work, it is not expected/designed to (hopefully it usually works)
-        # Promotes moves which trade your pawn for opponent king
-        for move in s.moves:
-            if not ((s.tiles[move[0]][move[1]].isPawn) and (s.tiles[move[2]][move[3]].isKing) and not s.isMoveSafe(
-                    move)):
-                s.badMoves.append(move)
-        s.removeBadMoves()
-
-        # This may not always work, it is not expected/designed to (hopefully it usually works)
-        # Promotes moves which trade kings when ahead in ***pieces <--might want to change classification of being ahead
-        for move in s.moves:
-            if not ((s.tiles[move[0]][move[1]].isKing) and (s.tiles[move[2]][move[3]].isKing) and not s.isMoveSafe(
-                    move) and s.hasMorePieces()):
-                s.badMoves.append(move)
-        s.removeBadMoves()
-
-        # This may not always work, it is not expected/designed to (hopefully it usually works)
-        # Promotes moves which trade pawns when ahead in ***pieces <--might want to change classification of being ahead
-        for move in s.moves:
-            if not ((s.tiles[move[0]][move[1]].isPawn) and (s.tiles[move[2]][move[3]].isPawn) and not s.isMoveSafe(
-                    move) and s.hasMorePieces()):
-                s.badMoves.append(move)
-        s.removeBadMoves()
-
-        # Promotes moves which does not endanger itself needlessly
-        for move in s.moves:
-            if not s.isMoveSafe(move):
-                # can sacrifice a piece and makes sure it won't be double jumped (only works if comp is white)
-                if (move[0] - 1 >= 0 and move[0] - 2 >= 0 and move[0] + 1 <= 7 and move[0] + 2 <= 7 and move[
-                    1] - 1 >= 0 and move[1] - 2 >= 0 and move[1] + 1 <= 7 and move[1] + 2 <= 7):
-                    if not (((s.tiles[move[0] - 1][move[1] - 1].isPiece and s.compIsColour == s.tiles[move[0] - 1][
-                        move[1] - 1].pieceColour) and \
-                             (s.tiles[move[0] - 2][move[1] - 2].isPiece and s.compIsColour == s.tiles[move[0] - 2][
-                                 move[1] - 2].pieceColour)) or \
-                            ((s.tiles[move[0] + 1][move[1] - 1].isPiece and s.compIsColour == s.tiles[move[0] + 1][
-                                move[1] - 1].pieceColour) and \
-                             (s.tiles[move[0] + 2][move[1] - 2].isPiece and s.compIsColour == s.tiles[move[0] + 2][
-                                 move[1] - 2].pieceColour)) or \
-                            ((s.tiles[move[2]][move[3]].x < s.tiles[move[0]][move[1]].x) and \
-                             (s.tiles[move[0] - 2][move[1]].isPiece and s.compIsColour == s.tiles[move[0] - 2][
-                                 move[1]].pieceColour)) or \
-                            ((s.tiles[move[2]][move[3]].x > s.tiles[move[0]][move[1]].x) and \
-                             (s.tiles[move[0] + 2][move[1]].isPiece and s.compIsColour == s.tiles[move[0] - 2][
-                                 move[1]].pieceColour))):
-                        s.badMoves.append(move)
-        s.removeBadMoves()
-
-        # should implement the next part to pick at random from the remaining moves (does not do this)
-        # performs the select and move action for the computer
-        m = randrange(0, len(s.moves))
-        if s.selectedTileAt == []:
-            s.Action(s.moves[m][0], s.moves[m][1])
-        s.Action(s.moves[m][2], s.moves[m][3])
+    # def CompTurn(s):
+    #     s.moves = s.movesAvailable()
+    #     s.badMoves = []
+    #
+    #     #######consider making s.goodMoves which replaces s.badMoves for many uses (changes conditions a bit as well)
+    #
+    #     # To prevent leaving the back row (currently top priority)
+    #     for move in s.moves:
+    #         if s.movesFromBack(move):
+    #             s.badMoves.append(move)
+    #     s.removeBadMoves()
+    #
+    #     # This may not always work, it is not expected/designed to (hopefully it usually works)
+    #     # It is meant to promote the use of moves that allow capture of another piece afterwards
+    #     for move in s.moves:
+    #         if not s.PieceCanCapture(s.moveEndsAt(move)[0], s.moveEndsAt(move)[1]):
+    #             s.badMoves.append(move)
+    #     s.removeBadMoves()
+    #
+    #     # Promotes move which make kings
+    #     for move in s.moves:
+    #         if not (((s.moveEndsAt(move)[1] == 7 and s.tiles[move[0]][move[1]].isWhite) or \
+    #                  (s.moveEndsAt(move)[1] == 0 and s.tiles[move[0]][move[1]].isBlack)) and \
+    #                 s.tiles[move[0]][move[1]].isPawn):
+    #             s.badMoves.append(move)
+    #     s.removeBadMoves()
+    #
+    #     # Promotes moves which take kings for free
+    #     for move in s.moves:
+    #         if not ((s.tiles[move[2]][move[3]].isKing) and s.isMoveSafe(move)):
+    #             s.badMoves.append(move)
+    #     s.removeBadMoves()
+    #
+    #     # This may not always work, it is not expected/designed to (hopefully it usually works)
+    #     # Promotes moves which trade your pawn for opponent king
+    #     for move in s.moves:
+    #         if not ((s.tiles[move[0]][move[1]].isPawn) and (s.tiles[move[2]][move[3]].isKing) and not s.isMoveSafe(
+    #                 move)):
+    #             s.badMoves.append(move)
+    #     s.removeBadMoves()
+    #
+    #     # This may not always work, it is not expected/designed to (hopefully it usually works)
+    #     # Promotes moves which trade kings when ahead in ***pieces <--might want to change classification of being ahead
+    #     for move in s.moves:
+    #         if not ((s.tiles[move[0]][move[1]].isKing) and (s.tiles[move[2]][move[3]].isKing) and not s.isMoveSafe(
+    #                 move) and s.hasMorePieces()):
+    #             s.badMoves.append(move)
+    #     s.removeBadMoves()
+    #
+    #     # This may not always work, it is not expected/designed to (hopefully it usually works)
+    #     # Promotes moves which trade pawns when ahead in ***pieces <--might want to change classification of being ahead
+    #     for move in s.moves:
+    #         if not ((s.tiles[move[0]][move[1]].isPawn) and (s.tiles[move[2]][move[3]].isPawn) and not s.isMoveSafe(
+    #                 move) and s.hasMorePieces()):
+    #             s.badMoves.append(move)
+    #     s.removeBadMoves()
+    #
+    #     # Promotes moves which does not endanger itself needlessly
+    #     for move in s.moves:
+    #         if not s.isMoveSafe(move):
+    #             # can sacrifice a piece and makes sure it won't be double jumped (only works if comp is white)
+    #             if (move[0] - 1 >= 0 and move[0] - 2 >= 0 and move[0] + 1 <= 7 and move[0] + 2 <= 7 and move[
+    #                 1] - 1 >= 0 and move[1] - 2 >= 0 and move[1] + 1 <= 7 and move[1] + 2 <= 7):
+    #                 if not (((s.tiles[move[0] - 1][move[1] - 1].isPiece and s.compIsColour == s.tiles[move[0] - 1][
+    #                     move[1] - 1].pieceColour) and \
+    #                          (s.tiles[move[0] - 2][move[1] - 2].isPiece and s.compIsColour == s.tiles[move[0] - 2][
+    #                              move[1] - 2].pieceColour)) or \
+    #                         ((s.tiles[move[0] + 1][move[1] - 1].isPiece and s.compIsColour == s.tiles[move[0] + 1][
+    #                             move[1] - 1].pieceColour) and \
+    #                          (s.tiles[move[0] + 2][move[1] - 2].isPiece and s.compIsColour == s.tiles[move[0] + 2][
+    #                              move[1] - 2].pieceColour)) or \
+    #                         ((s.tiles[move[2]][move[3]].x < s.tiles[move[0]][move[1]].x) and \
+    #                          (s.tiles[move[0] - 2][move[1]].isPiece and s.compIsColour == s.tiles[move[0] - 2][
+    #                              move[1]].pieceColour)) or \
+    #                         ((s.tiles[move[2]][move[3]].x > s.tiles[move[0]][move[1]].x) and \
+    #                          (s.tiles[move[0] + 2][move[1]].isPiece and s.compIsColour == s.tiles[move[0] - 2][
+    #                              move[1]].pieceColour))):
+    #                     s.badMoves.append(move)
+    #     s.removeBadMoves()
+    #
+    #     # should implement the next part to pick at random from the remaining moves (does not do this)
+    #     # performs the select and move action for the computer
+    #     m = randrange(0, len(s.moves))
+    #     if s.selectedTileAt == []:
+    #         s.Action(s.moves[m][0], s.moves[m][1])
+    #     s.Action(s.moves[m][2], s.moves[m][3])
 
     ####
     # +-added to determine whether the player whose turn it is has more pieces than opponent
